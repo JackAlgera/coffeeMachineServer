@@ -28,9 +28,9 @@ String dateToMakeCoffee = "";
 unsigned long getTime() {
   time_t now;
   struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
-    //Serial.println("Failed to obtain time");
-    return(0);
+  while (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time, trying again in 1s");
+    delay(1000);
   }
   time(&now);
   return now + 7200;
