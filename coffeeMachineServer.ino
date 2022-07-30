@@ -14,8 +14,8 @@ AsyncWebServer server(80);
 
 // Global variables
 String request;
-String currentState = "doing nothing...";
-Timer<10, millis, int> timer;
+String currentState = "";
+Timer<20, millis, int> timer;
 
 // GPIO pins to control relays
 const int makeCoffeeRelayPin  = 27;
@@ -114,6 +114,7 @@ void setup() {
   });
   
   server.begin();
+  printMessage(0);
 
   // Init and get the time
   const char* ntpServer = "pool.ntp.org";
@@ -143,14 +144,16 @@ bool printMessage(int val) {
 }
 
 void makeCoffee(int hour, int minute) {
+  timer.cancel();
+  
   dateToMakeCoffee = generateDatetime(hour, minute);
   dateToMakeCoffee.replace("%20", " ");
   long unsigned delayToMakeCoffee = getEpochDateFor(hour, minute) - now();
   
   printMessage(3);
   triggerClick(turnOnRelayPin, delayToMakeCoffee, 1);
-  triggerClick(makeCoffeeRelayPin, delayToMakeCoffee + 30, 2);
-  timer.in((delayToMakeCoffee + 60) * 1000, printMessage, 0);
+  triggerClick(makeCoffeeRelayPin, delayToMakeCoffee + 35, 2);
+  timer.in((delayToMakeCoffee + 70) * 1000, printMessage, 0);
 }
 
 void triggerClick(int pin, int delayInSeconds, int messageVal) {
