@@ -54,9 +54,13 @@ const char index_html[] PROGMEM = R"rawliteral(
   <h1>Coffee controller</h1>
   <p><h3>Currently: %STATEPLACEHOLDER%</h3>
   <form action="/makeCoffee">
-    <div class="spaced">Hour: <input type="number" name="hour"></div>
-    <div class="spaced">Minute: <input type="number" name="minute"></div>
+    <div class="spaced">In how many days: <input type="number" name="inDays"></div>
+    <div class="spaced">Hours (HH): <input type="number" name="hours"></div>
+    <div class="spaced">Minutes (MM): <input type="number" name="minutes"></div>
     <input type="submit" class="button" value="Submit">
+  </form><br>
+  <form action="/cancel">
+    <input type="submit" class="button" value="Cancel">
   </form><br>
   <p><h3>Will make coffee on</h3></p>
   <p><h3>%DATETOMAKECOFFEEPLACEHOLDER%</h3></p>
@@ -105,11 +109,19 @@ void setup() {
 
   // Send a GET request to <ESP_IP>/update?output=<inputMessage1>&state=<inputMessage2>
   server.on("/makeCoffee", HTTP_GET, [] (AsyncWebServerRequest *request) {
-    int newHour = request->getParam("hour")->value().toInt();
-    int newMinute = request->getParam("minute")->value().toInt();
+    int inDays = request->getParam("inDays")->value().toInt();
+    int hours = request->getParam("hours")->value().toInt();
+    int minutes = request->getParam("minutes")->value().toInt();
     
-    makeCoffee(newHour, newMinute);
+    makeCoffee(inDays, hours, minutes);
     
+    request->redirect("/");
+  });
+
+  server.on("/cancel", HTTP_GET, [] (AsyncWebServerRequest *request) {
+    printMessage(0);
+    timer.cancel();
+     
     request->redirect("/");
   });
   
@@ -143,12 +155,11 @@ bool printMessage(int val) {
   return false;
 }
 
-void makeCoffee(int hour, int minute) {
+void makeCoffee(int inDays, int hours, int minutes) {
   timer.cancel();
   
-  dateToMakeCoffee = generateDatetime(hour, minute);
-  dateToMakeCoffee.replace("%20", " ");
-  long unsigned delayToMakeCoffee = getEpochDateFor(hour, minute) - now();
+  long unsigned delayToMakeCoffee = getEpochDateFor(inDays, hours, minutes) - now();
+  dateToMakeCoffee = generateDatetimeFromTimestamp(now() + delayToMakeCoffee);
   
   printMessage(3);
   triggerClick(turnOnRelayPin, delayToMakeCoffee, 1);
@@ -176,11 +187,11 @@ bool switchPin(int pin) {
 
 String timeServerUrl = "https://showcase.api.linx.twenty57.net/UnixTime/tounix";
 
-long getEpochDateFor(int hour, int minute) {
+long getEpochDateFor(int days, int hours, int minutes) {
   HTTPClient http;
   long unsigned payload = -1;
 
-  String dateUri = timeServerUrl + "?date=" + generateDatetime(hour, minute);
+  String dateUri = timeServerUrl + "?date=" + generateDatetime(days, hours, minutes);
   Serial.println(dateUri);
   
   // Your Domain name with URL path or IP address with path
@@ -204,9 +215,47 @@ long getEpochDateFor(int hour, int minute) {
   return payload;
 }
 
-String generateDatetime(int hour, int minute) {
+String generateDatetimeFromTimestamp(long timestampDelay) {
   String date = "";
-  long currentTimestamp = now() + 60 * 60 * 24;
+
+  date.concat(year(timestampDelay));
+  date.concat("/");
+
+  if (month(timestampDelay) < 10) {
+    date += "0";
+  }
+  date.concat(month(timestampDelay));
+  date.concat("/");
+
+  if (day(timestampDelay) < 10) {
+    date += "0";
+  }
+  date.concat(day(timestampDelay));
+  date.concat(" ");
+
+  if (hour(timestampDelay) < 10) {
+    date += "0";
+  }
+  date.concat(hour(timestampDelay));
+  date.concat(":");
+
+  if (minute(timestampDelay) < 10) {
+    date += "0";
+  }
+  date.concat(minute(timestampDelay));
+  date.concat(":");
+
+  if (second(timestampDelay) < 10) {
+    date += "0";
+  }
+  date.concat(second(timestampDelay));
+
+  return date;
+}
+
+String generateDatetime(int days, int hours, int minutes) {
+  String date = "";
+  long currentTimestamp = now() + 60 * 60 * 24 * days;
 
   date.concat(year(currentTimestamp));
   date.concat("/");
@@ -223,16 +272,16 @@ String generateDatetime(int hour, int minute) {
   date.concat(day(currentTimestamp));
   date.concat("%20");
 
-  if (hour < 10) {
+  if (hours < 10) {
     date += "0";
   }
-  date.concat(hour);
+  date.concat(hours);
   date.concat(":");
 
-  if (minute < 10) {
+  if (minutes < 10) {
     date += "0";
   }
-  date.concat(minute);
+  date.concat(minutes);
   date.concat(":");
 
   if (second(currentTimestamp) < 10) {
